@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentos - Registro Clínicos</title>
+<link rel="stylesheet" href="../css/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<!-- HEADER CON LOGO -->
+<header class="app-header">
+  <div class="header-content">
+    <img src="../assets/descarga.png" alt="Logo" class="header-logo">
+    <h1 class="header-title">Registro de Documentos Clínicos</h1>
+    <div class="header-meta" aria-label="Identificación del paciente">
+      <span class="header-chip"><span class="header-chip-label">Tipo:</span> <span id="hdr-histipdoc-docs">—</span></span>
+      <span class="header-chip"><span class="header-chip-label">Doc:</span> <span id="hdr-hisckey-docs">—</span></span>
+    </div>
+  </div>
+</header>
+
+<!-- SECCIÓN DE DOCUMENTOS -->
+<div class="container">
+  <div class="section">
+    <h2>Documentos</h2>
+
+    <div class="drop-zone" id="dropZone">
+      <strong>Arrastre y suelte los documentos PDF aquí</strong>
+      <p>o</p>
+      <button type="button" tabindex="-1">Seleccionar archivos</button>
+      <input type="file" id="fileInput" multiple hidden accept=".pdf,application/pdf">
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="action-buttons">
+    <button class="save-btn" onclick="guardar()" tabindex="-1">Guardar</button>
+  </div>
+</div>
+
+<!-- Notificaciones (no bloquean la pantalla) -->
+<div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Overlay de carga (rueda) -->
+<div id="loadingOverlay" class="loading-overlay" hidden aria-hidden="true">
+  <div class="loading-card" role="status" aria-live="polite">
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <div id="loadingText" class="loading-text">Guardando…</div>
+  </div>
+</div>
+
+<!-- Modal de confirmación (no bloqueante) -->
+<div id="confirmModal" class="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle" aria-describedby="confirmModalDesc">
+    <div class="modal-header">
+      <h3 id="confirmModalTitle" class="modal-title">Confirmar</h3>
+    </div>
+    <div id="confirmModalDesc" class="modal-body">
+      ¿Desea guardar?
+    </div>
+    <div class="modal-actions">
+      <button id="confirmModalCancel" type="button" class="btn-secondary">Revisar</button>
+      <button id="confirmModalConfirm" type="button" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/documentos.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro Documentos Clínicos</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      background: #eef2f6;
+    }
+    .splash-logo {
+      max-width: 280px;
+      height: auto;
+      display: block;
+    }
+    .splash-loading {
+      width: 160px;
+      height: 4px;
+      background: #d6dce8;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .splash-loading::after {
+      content: "";
+      display: block;
+      width: 0;
+      height: 100%;
+      background: #1f3c88;
+      border-radius: 2px;
+      animation: splash-progress 1s ease-out forwards;
+    }
+    @keyframes splash-progress {
+      0% { width: 0; }
+      100% { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <img class="splash-logo" src="assets/descarga.png" alt="Logo">
+  <div class="splash-loading" aria-hidden="true"></div>
+  <script>
+    setTimeout(function () {
+      window.location.href = "pages/login.html";
+    }, 1000);
+  </script>
+</body>
+</html>

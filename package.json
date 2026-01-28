@@ -1,0 +1,23 @@
+{
+  "name": "registro-documentos-clinicos",
+  "version": "1.0.0",
+  "description": "Aplicación de escritorio para registro de documentos clínicos",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "dev": "electron . --dev --no-sandbox"
+  },
+  "keywords": [
+    "electron",
+    "documentos",
+    "clinicos"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.3.3"
+  },
+  "dependencies": {
+    "vite": "^7.3.1"
+  }
+}

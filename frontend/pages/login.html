@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Registro Documentos Clínicos</title>
+<link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<!-- PANTALLA DE LOGIN -->
+<div class="login-screen">
+  <div class="logo-container">
+    <img src="../assets/descarga.png" alt="Logo" class="logo">
+  </div>
+  <h1>Registro de Documentos Clínicos</h1>
+  <label for="loginHistipdoc" class="login-label">Tipo de documento</label>
+  <select id="loginHistipdoc" class="login-select" required>
+    <option value="">Seleccione tipo de documento</option>
+    <option value="CC">Cédula de ciudadanía</option>
+    <option value="TI">Tarjeta de identidad</option>
+    <option value="CE">Cédula extranjería</option>
+    <option value="PA">Pasaporte</option>
+    <option value="RC">Registro civil</option>
+    <option value="CNV">Certificado de nacido vivo</option>
+    <option value="DE">Documento extranjero</option>
+    <option value="CD">Carné diplomático</option>
+    <option value="ASI">Adulto sin identificación</option>
+    <option value="MSI">Menor sin identificación</option>
+    <option value="SI">Sin identificación</option>
+    <option value="SC">Salvoconducto</option>
+    <option value="PEP">Permiso especial de permanencia</option>
+    <option value="PTP">Permiso temporal de permanencia</option>
+  </select>
+  <label for="loginHisckey" class="login-label">Número de documento</label>
+  <input type="text" id="loginHisckey" placeholder="Ej. 1002456897" required>
+  <button type="button" onclick="iniciarSesion()" tabindex="-1">Continuar</button>
+  <p class="login-help-text">Seleccione el tipo de documento e ingrese el número para continuar</p>
+</div>
+
+<!-- Notificaciones (toast) -->
+<div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<script src="../js/config.js"></script>
+<script src="../js/login.js"></script>
+</body>
+</html>

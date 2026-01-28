@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro - Documentos Clínicos</title>
+<link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<!-- HEADER -->
+<header class="app-header">
+  <div class="header-content">
+    <h1 class="header-title">Registro de Documentos Clínicos</h1>
+    <div class="header-meta" aria-label="Identificación del paciente">
+      <span class="header-chip"><span class="header-chip-label">Tipo:</span> <span id="hdr-histipdoc">—</span></span>
+      <span class="header-chip"><span class="header-chip-label">Doc:</span> <span id="hdr-hisckey">—</span></span>
+    </div>
+  </div>
+</header>
+
+<!-- FORMULARIO PRINCIPAL -->
+<div class="container">
+  <!-- Logo grande dentro del panel blanco, en la parte superior -->
+  <div class="footer-logo">
+    <img src="../assets/descarga.png" alt="Logo Medihelp" />
+  </div>
+
+  <!-- FORMULARIO PRINCIPAL -->
+  <div class="section">
+    <h2>Datos del Registro</h2>
+    <p id="capbas-msg" class="capbas-msg" aria-live="polite"></p>
+    <details class="capbas-logs-wrap">
+      <summary>Logs de la petición (capbas)</summary>
+      <pre id="capbas-logs" class="capbas-logs"></pre>
+    </details>
+
+    <div class="grid-form">
+      <div class="field-wrapper">
+        <span class="field-label">Tipo de documento:</span>
+        <input id="histipdoc" placeholder="TIPO DE DOCUMENTO" readonly>
+      </div>
+
+      <div class="field-wrapper">
+        <span class="field-label">Número de documento:</span>
+        <input id="hisckey" placeholder="CÉDULA" readonly>
+      </div>
+
+      <div class="field-wrapper">
+        <span class="field-label">Nombres:</span>
+        <input id="nombres" placeholder="NOMBRES" readonly>
+      </div>
+
+      <div class="field-wrapper">
+        <span class="field-label">Apellidos:</span>
+        <input id="apellidos" placeholder="APELLIDOS" readonly>
+      </div>
+
+      <div class="field-wrapper folio-wrapper">
+        <span class="field-label">Número de folio:</span>
+        <input id="hiscsec" placeholder="" readonly>
+      </div>
+
+      <input id="imafechor" type="datetime-local" hidden>
+
+      <textarea id="imaobs" placeholder="Observaciones"></textarea>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="irADocumentos()" tabindex="-1">Continuar a Documentos</button>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/registro.js"></script>
+</body>
+</html>
