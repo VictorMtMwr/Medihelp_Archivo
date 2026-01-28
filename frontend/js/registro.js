@@ -3,9 +3,9 @@ const API_BASE = (typeof window !== "undefined" && window.APP_CONFIG)
   ? window.APP_CONFIG.BACKEND_BASE
   : "http://127.0.0.1:8000";
 
-const API_USERINFO = (typeof window !== "undefined" && window.APP_CONFIG)
-  ? window.APP_CONFIG.MEDIHELP_BASE
-  : "http://api-service:8080/Medihelp-api";
+// IMPORTANTE: en Electron, los llamados directos a la API interna pueden fallar por CORS/red.
+// Por eso, TODO se hace vía el backend local que actúa como proxy.
+const API_PROXY = API_BASE;
 
 function logCapbas(line) {
   const el = document.getElementById("capbas-logs");
@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (hdrTip) hdrTip.textContent = histipdoc;
   if (hdrKey) hdrKey.textContent = hisckey;
 
-  const url = `${API_USERINFO}/capbas/get/${encodeURIComponent(histipdoc)}/${encodeURIComponent(hisckey)}`;
+  const url = `${API_PROXY}/api/capbas/get/${encodeURIComponent(histipdoc)}/${encodeURIComponent(hisckey)}`;
   const msgEl = document.getElementById("capbas-msg");
   const logsEl = document.getElementById("capbas-logs");
   if (logsEl) logsEl.textContent = "";
@@ -132,6 +132,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     logCapbas("Extraídos: nombres=\"" + nombres + "\" apellidos=\"" + apellidos + "\"");
     document.getElementById("nombres").value = nombres;
     document.getElementById("apellidos").value = apellidos;
+    const hdrNombre = document.getElementById("hdr-nombre-apellido");
+    if (hdrNombre) hdrNombre.textContent = [nombres, apellidos].filter(Boolean).join(" ") || "—";
     if (msgEl) msgEl.textContent = "";
 
     // --- Consulta adicional: ingresos/get/{hisckey}/{histipdoc} vía backend ---
@@ -218,5 +220,8 @@ function irADocumentos() {
   sessionStorage.setItem("imausureg", "");
   sessionStorage.setItem("nombres", document.getElementById("nombres").value);
   sessionStorage.setItem("apellidos", document.getElementById("apellidos").value);
+  // A partir de aquí, el usuario ya entró al flujo de carga de documentos.
+  // Solo desde este punto se debe bloquear el cierre si hay folio abierto.
+  try { sessionStorage.setItem("folio_close_block_enabled", "true"); } catch (_e) {}
   window.location.href = "documentos.html";
 }

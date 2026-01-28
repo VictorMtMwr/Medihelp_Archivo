@@ -13,6 +13,12 @@ ENV/
 node_modules/
 package-lock.json
 
+# Build / outputs (no versionar binarios)
+dist/
+dist-build/
+build/
+Medihelp Archivo Runtime/
+
 # Datos
 data/
 *.txt

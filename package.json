@@ -5,7 +5,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron . --no-sandbox",
-    "dev": "electron . --dev --no-sandbox"
+    "dev": "electron . --dev --no-sandbox",
+    "dist": "electron-builder",
+    "dist:portable": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; New-Item -ItemType Directory -Force build | Out-Null; Compress-Archive -Path .\\venv -DestinationPath .\\build\\venv.zip -Force; .\\node_modules\\.bin\\electron-builder.cmd --win portable\"",
+    "build": "powershell -NoProfile -Command \"$ErrorActionPreference='Continue'; Get-Process | Where-Object ProcessName -like 'Medihelp*' | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue .\\dist-build; $ErrorActionPreference='Stop'; New-Item -ItemType Directory -Force build | Out-Null; Compress-Archive -Path .\\venv -DestinationPath .\\build\\venv.zip -Force; .\\node_modules\\.bin\\electron-builder.cmd --win portable\""
   },
   "keywords": [
     "electron",
@@ -15,9 +18,45 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.3.3"
-  },
-  "dependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^26.0.12",
     "vite": "^7.3.1"
+  },
+  "dependencies": {},
+  "build": {
+    "appId": "com.medihelp.archivo",
+    "productName": "Medihelp Archivo",
+    "icon": "frontend/assets/descarga.png",
+    "directories": {
+      "output": "dist-build"
+    },
+    "asar": true,
+    "disableDefaultIgnoredFiles": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "frontend/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      },
+      {
+        "from": "build/venv.zip",
+        "to": "venv.zip"
+      }
+    ],
+    "win": {
+      "icon": "frontend/assets/icon.ico",
+      "target": [
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.exe"
+    }
   }
 }

@@ -28,13 +28,22 @@ app.add_middleware(
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 
-# Servir archivos estáticos del frontend
-app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+# Servir archivos estáticos del frontend (solo si existe).
+# En el empaquetado Electron, el frontend vive dentro de app.asar (no es un directorio real para Python),
+# por lo que este mount debe ser opcional para evitar que el backend falle al iniciar.
+if FRONTEND_DIR.exists() and FRONTEND_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 @app.get("/")
 async def read_root():
-    """Sirve la splash (index) en la ruta raíz"""
-    return FileResponse(str(FRONTEND_DIR / "index.html"))
+    """
+    En desarrollo puede servir la splash (index) en la ruta raíz.
+    En producción (Electron), el frontend lo carga Electron, así que devolvemos estado.
+    """
+    index_path = FRONTEND_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return {"ok": True, "service": "medihelp-backend", "frontend": "served-by-electron"}
 
 # Ruta a la carpeta data (relativa a la raíz del proyecto)
 DATA_FILE = BASE_DIR / "data" / "registros.txt"

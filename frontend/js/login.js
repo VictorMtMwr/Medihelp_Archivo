@@ -1,5 +1,9 @@
 // Función para iniciar sesión
 async function iniciarSesion() {
+  const API_BASE = (typeof window !== "undefined" && window.APP_CONFIG)
+    ? window.APP_CONFIG.BACKEND_BASE
+    : "http://127.0.0.1:8000";
+
   const loginHistipdoc = document.getElementById("loginHistipdoc").value.trim();
   const loginHisckey = document.getElementById("loginHisckey").value.trim();
   const helpText = document.querySelector(".login-help-text");
@@ -31,7 +35,7 @@ async function iniciarSesion() {
     }
 
     // Consultar HISCSEC en el backend usando el HISCKEY
-    const resp = await fetch(`http://127.0.0.1:8000/api/hiscsec/${encodeURIComponent(loginHisckey)}`);
+    const resp = await fetch(`${API_BASE}/api/hiscsec/${encodeURIComponent(loginHisckey)}`);
 
     if (!resp.ok) {
       if (resp.status === 404) {

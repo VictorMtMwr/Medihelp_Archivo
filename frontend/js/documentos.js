@@ -73,7 +73,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const hdrKey = document.getElementById("hdr-hisckey-docs");
   if (hdrTip) hdrTip.textContent = histipdoc;
   if (hdrKey) hdrKey.textContent = hisckey;
-  
+  const nombres = sessionStorage.getItem("nombres") || "";
+  const apellidos = sessionStorage.getItem("apellidos") || "";
+  const hdrNombre = document.getElementById("hdr-nombre-apellido-docs");
+  if (hdrNombre) hdrNombre.textContent = [nombres, apellidos].filter(Boolean).join(" ") || "—";
+
   // Inicializar event listeners
   if (dropZone && fileInput) {
     dropZone.addEventListener("click", () => fileInput.click());

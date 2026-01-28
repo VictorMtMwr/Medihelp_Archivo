@@ -1,5 +1,10 @@
 let archivos = [];
 
+// Backend local (FastAPI) que actúa como proxy y guarda registros
+const API_BASE = (typeof window !== "undefined" && window.APP_CONFIG)
+  ? window.APP_CONFIG.BACKEND_BASE
+  : "http://127.0.0.1:8000";
+
 // Ruta base configurada automáticamente
 const RUTA_BASE = "\\filemh01\USERS\gustavob\Documents\GUSTAVO.BLANCO";
 
@@ -232,7 +237,7 @@ function guardar() {
         const registro = registros[i];
         console.log(`Guardando registro ${i + 1} de ${registros.length}:`, registro);
         
-        const response = await fetch("http://localhost:8000/guardar", {
+        const response = await fetch(`${API_BASE}/guardar`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(registro)

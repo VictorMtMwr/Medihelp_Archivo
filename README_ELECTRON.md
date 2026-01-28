@@ -30,6 +30,26 @@ npm start
 npm run dev
 ```
 
+## Generar ejecutable portable (Windows)
+
+Este proyecto inicia un servidor **Python/FastAPI** al arrancar Electron. Para que el `.exe` sea realmente “portable”, lo ideal es tener un `venv/` en la raíz del proyecto (aunque esté en `.gitignore`), porque el empaquetado lo incluirá como recurso “unpacked”.
+
+1. Instala dependencias de Node:
+```bash
+npm install
+```
+
+2. (Recomendado) Crea/actualiza el `venv/` con dependencias del backend:
+   - Asegúrate de que al ejecutar `npm start` el servidor Python arranca sin errores.
+
+3. Genera el portable:
+```bash
+npm run dist:portable
+```
+
+Salida esperada:
+- `dist/Medihelp Archivo-Portable-1.0.0.exe` (el número de versión depende de `package.json`)
+
 ## Cómo Funciona
 
 1. **Inicio Automático del Servidor**: Cuando inicias la aplicación, automáticamente se inicia el servidor FastAPI en segundo plano en `http://localhost:8000`.
