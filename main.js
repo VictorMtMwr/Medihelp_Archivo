@@ -19,7 +19,7 @@ function getAsarDir() {
 }
 
 function getUnpackedDir() {
-  // Archivos extraResources (backend/, venv/) viven directamente en process.resourcesPath.
+  // Archivos extraResources (backend/, python-embed.zip, site-packages.zip) viven directamente en process.resourcesPath.
   // En desarrollo, viven en la raíz del proyecto.
   if (app.isPackaged) return process.resourcesPath;
   return __dirname;
@@ -41,77 +41,188 @@ function getPortableWritableDir() {
   return path.join(app.getPath('userData'), 'runtime');
 }
 
-function getRuntimePythonCandidates() {
-  const base = getPortableWritableDir();
-  if (process.platform === 'win32') {
-    // Soportar ambos layouts:
-    // A) targetDir\venv\Scripts\python.exe  (zip contiene carpeta venv/)
-    // B) targetDir\Scripts\python.exe       (zip contiene el contenido de venv/ sin la carpeta)
-    return [
-      path.join(base, 'venv', 'Scripts', 'python.exe'),
-      path.join(base, 'Scripts', 'python.exe'),
-    ];
-  }
-  return [
-    path.join(base, 'venv', 'bin', 'python'),
-    path.join(base, 'bin', 'python'),
-  ];
+function getRuntimeEmbeddedPythonDir() {
+  return path.join(getPortableWritableDir(), 'python');
 }
 
-function getBundledVenvZipPath() {
-  // El zip se empaqueta como extraResource -> process.resourcesPath/venv.zip
-  if (app.isPackaged) return path.join(process.resourcesPath, 'venv.zip');
-  // En desarrollo, se genera en build/venv.zip cuando se construye.
-  return path.join(__dirname, 'build', 'venv.zip');
+function getRuntimeEmbeddedPythonExe() {
+  const pyDir = getRuntimeEmbeddedPythonDir();
+  if (process.platform === 'win32') return path.join(pyDir, 'python.exe');
+  // No soportado por ahora: este empaquetado está enfocado en Windows portable.
+  return path.join(pyDir, 'python');
 }
 
-async function ensureRuntimeVenvExtracted() {
-  const candidates = getRuntimePythonCandidates();
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return { ok: true, pythonExe: c };
-  }
+function getBundledPythonEmbedZipPath() {
+  // Debe empaquetarse como extraResource -> process.resourcesPath/python-embed.zip
+  if (app.isPackaged) return path.join(process.resourcesPath, 'python-embed.zip');
+  return path.join(__dirname, 'build', 'python-embed.zip');
+}
 
-  const zipPath = getBundledVenvZipPath();
-  if (!fs.existsSync(zipPath)) {
-    return { ok: false, pythonExe: candidates[0], error: `No se encontró venv.zip: ${zipPath}` };
-  }
+function getBundledSitePackagesZipPath() {
+  // Debe empaquetarse como extraResource -> process.resourcesPath/site-packages.zip
+  if (app.isPackaged) return path.join(process.resourcesPath, 'site-packages.zip');
+  return path.join(__dirname, 'build', 'site-packages.zip');
+}
 
-  const targetDir = getPortableWritableDir();
+async function expandZipWindows(zipPath, destPath) {
+  await new Promise((resolve, reject) => {
+    const ps = spawn(
+      'powershell',
+      [
+        '-NoProfile',
+        '-Command',
+        `Expand-Archive -LiteralPath "${zipPath}" -DestinationPath "${destPath}" -Force`,
+      ],
+      { stdio: 'ignore', shell: false }
+    );
+    ps.on('error', reject);
+    ps.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Expand-Archive falló (code=${code})`))));
+  });
+}
+
+async function patchEmbeddedPythonPth(pyDir) {
+  // El Python embeddable usa un archivo pythonXY._pth al lado de python.exe.
+  // Para habilitar site-packages, debemos:
+  // - agregar "Lib\\site-packages"
+  // - asegurar "import site" (sin #)
+  let entries = [];
   try {
-    await fsp.mkdir(targetDir, { recursive: true });
+    entries = await fsp.readdir(pyDir);
+  } catch (_e) {
+    return;
+  }
+
+  const pthName = entries.find((n) => n.toLowerCase().endsWith('._pth'));
+  if (!pthName) return;
+
+  const pthPath = path.join(pyDir, pthName);
+  let txt = '';
+  try {
+    txt = await fsp.readFile(pthPath, 'utf8');
+  } catch (_e) {
+    return;
+  }
+
+  const lines = txt.split(/\r?\n/);
+  const norm = (s) => String(s || '').trim().toLowerCase();
+
+  const hasSitePkgs = lines.some((l) => norm(l) === 'lib\\site-packages' || norm(l) === '.\\lib\\site-packages');
+  const hasImportSite = lines.some((l) => norm(l) === 'import site');
+  const hasCommentedImportSite = lines.some((l) => norm(l) === '#import site' || norm(l) === '# import site');
+
+  const out = [...lines.filter((l) => l !== undefined)];
+  // Insertar site-packages antes de import site/comentarios finales si es posible.
+  if (!hasSitePkgs) {
+    // buscar posición: antes de la última línea vacía final
+    let insertAt = out.length;
+    while (insertAt > 0 && norm(out[insertAt - 1]) === '') insertAt -= 1;
+    out.splice(insertAt, 0, 'Lib\\site-packages');
+  }
+
+  if (!hasImportSite) {
+    if (hasCommentedImportSite) {
+      for (let i = 0; i < out.length; i++) {
+        if (hasCommentedImportSite && (norm(out[i]) === '#import site' || norm(out[i]) === '# import site')) {
+          out[i] = 'import site';
+        }
+      }
+    } else {
+      // agregar al final (antes de espacios)
+      let insertAt = out.length;
+      while (insertAt > 0 && norm(out[insertAt - 1]) === '') insertAt -= 1;
+      out.splice(insertAt, 0, 'import site');
+    }
+  }
+
+  // Normalizar finales de línea a CRLF para Windows
+  const newTxt = out.join('\r\n');
+  try {
+    await fsp.writeFile(pthPath, newTxt, 'utf8');
+  } catch (_e) {
+    // ignore
+  }
+}
+
+async function ensureRuntimeEmbeddedPythonReady() {
+  const runtimeDir = getPortableWritableDir();
+  const pyDir = getRuntimeEmbeddedPythonDir();
+  const pyExe = getRuntimeEmbeddedPythonExe();
+  const markerPath = path.join(runtimeDir, 'runtime-version.txt');
+  const version = app.getVersion();
+
+  const embedZip = getBundledPythonEmbedZipPath();
+  const siteZip = getBundledSitePackagesZipPath();
+
+  // Si recompilas el .exe con la MISMA versión pero cambian los recursos,
+  // queremos re-extraer igualmente (caso típico al reemplazar el portable en red).
+  let embedSig = '0';
+  let siteSig = '0';
+  try {
+    const st1 = await fsp.stat(embedZip);
+    embedSig = `${st1.size}`;
+  } catch (_e) {}
+  try {
+    const st2 = await fsp.stat(siteZip);
+    siteSig = `${st2.size}`;
+  } catch (_e) {}
+  const signature = `${version}|embed=${embedSig}|site=${siteSig}`;
+
+  // Re-extraer si cambia la firma (para evitar quedarse con un runtime viejo en red)
+  let marker = null;
+  try { marker = (await fsp.readFile(markerPath, 'utf8')).trim(); } catch (_e) {}
+  const mustExtract = marker !== signature;
+
+  if (!mustExtract && fs.existsSync(pyExe)) {
+    return { ok: true, pythonExe: pyExe };
+  }
+
+  if (process.platform !== 'win32') {
+    return { ok: false, pythonExe: pyExe, error: 'Python embeddable solo está configurado para Windows.' };
+  }
+
+  if (!fs.existsSync(embedZip)) {
+    return { ok: false, pythonExe: pyExe, error: `No se encontró python-embed.zip: ${embedZip}` };
+  }
+  if (!fs.existsSync(siteZip)) {
+    return { ok: false, pythonExe: pyExe, error: `No se encontró site-packages.zip: ${siteZip}` };
+  }
+
+  try {
+    await fsp.mkdir(pyDir, { recursive: true });
   } catch (_e) {
     // ignore
   }
 
-  // Descomprimir con PowerShell (disponible en Windows).
-  if (process.platform === 'win32') {
-    await new Promise((resolve, reject) => {
-      const ps = spawn(
-        'powershell',
-        [
-          '-NoProfile',
-          '-Command',
-          `Expand-Archive -LiteralPath "${zipPath}" -DestinationPath "${targetDir}" -Force`,
-        ],
-        { stdio: 'ignore', shell: false }
-      );
-      ps.on('error', reject);
-      ps.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Expand-Archive falló (code=${code})`))));
-    });
-  } else {
-    return { ok: false, pythonExe: candidates[0], error: 'Extracción de venv.zip no soportada en este SO.' };
+  // Extraer Python embeddable a runtime/python
+  try {
+    await expandZipWindows(embedZip, pyDir);
+  } catch (e) {
+    return { ok: false, pythonExe: pyExe, error: `Falló extracción python-embed.zip: ${String(e?.message || e)}` };
   }
 
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return { ok: true, pythonExe: c };
+  // Extraer site-packages en runtime/python/Lib/site-packages
+  const spDir = path.join(pyDir, 'Lib', 'site-packages');
+  try {
+    await fsp.mkdir(spDir, { recursive: true });
+  } catch (_e) {
+    // ignore
   }
-  return {
-    ok: false,
-    pythonExe: candidates[0],
-    error:
-      `Se extrajo venv.zip pero no apareció python.exe.\n` +
-      `Rutas probadas:\n- ${candidates.join('\n- ')}`,
-  };
+  try {
+    await expandZipWindows(siteZip, spDir);
+  } catch (e) {
+    return { ok: false, pythonExe: pyExe, error: `Falló extracción site-packages.zip: ${String(e?.message || e)}` };
+  }
+
+  // Parchear el ._pth para que reconozca site-packages
+  await patchEmbeddedPythonPth(pyDir);
+
+  // Guardar marker de versión+firma (para re-extraer aunque no cambie version)
+  try { await fsp.writeFile(markerPath, `${signature}\r\n`, 'utf8'); } catch (_e) {}
+
+  if (!fs.existsSync(pyExe)) {
+    return { ok: false, pythonExe: pyExe, error: `Se extrajo Python pero no apareció python.exe en: ${pyExe}` };
+  }
+  return { ok: true, pythonExe: pyExe };
 }
 
 function checkBackendOnce(url = 'http://127.0.0.1:8000/') {
@@ -220,18 +331,19 @@ function getBackendLogPath() {
 }
 
 // Función para iniciar el servidor Python
-function startPythonServer() {
+function startPythonServer(pythonPathOverride = null) {
   const backendDir = getBackendDir();
 
   // Detectar ruta de Python dependiendo del SO y del venv
-  let pythonPath = null;
+  let pythonPath = pythonPathOverride || null;
 
   if (process.platform === 'win32') {
-    // En Windows, preferimos el venv empaquetado (extraído) para que sea portable.
-    const [candidate1, candidate2] = getRuntimePythonCandidates();
-    if (fs.existsSync(candidate1)) pythonPath = candidate1;
-    else if (fs.existsSync(candidate2)) pythonPath = candidate2;
-    else pythonPath = 'python';
+    // En Windows, preferimos Python embeddable extraído al runtime (portable real).
+    if (!pythonPath) {
+      const embedded = getRuntimeEmbeddedPythonExe();
+      if (fs.existsSync(embedded)) pythonPath = embedded;
+      else pythonPath = 'python';
+    }
   } else {
     // Linux / macOS: venv/bin/python, python3 o python
     const pythonNames = ['python', 'python3'];
@@ -327,12 +439,10 @@ function createWindow() {
       mustBlock = await mainWindow.webContents.executeJavaScript(
         `(() => {
           try {
-            const locked = localStorage.getItem('folio_locked') === 'true';
-            const closed = localStorage.getItem('folio_closed') === 'true';
-            // Este flag se setea en sessionStorage cuando el usuario entra a Documentos (Continuar).
-            // Si no ha continuado, debe poder cerrar la app normalmente.
-            const closeBlockEnabled = sessionStorage.getItem('folio_close_block_enabled') === 'true';
-            return closeBlockEnabled && locked && !closed;
+            // Bloquear cierre cuando ya se hizo la petición a booking y aún no se han guardado documentos
+            const bookingDone = sessionStorage.getItem('booking_done') === 'true';
+            const docsUploaded = sessionStorage.getItem('docs_uploaded') === 'true';
+            return bookingDone && !docsUploaded;
           } catch (e) { return false; }
         })()`,
         true
@@ -440,21 +550,19 @@ function createWindow() {
 // Cuando la aplicación esté lista
 app.whenReady().then(() => {
   (async () => {
-    // Asegurar que el runtime python (venv) exista en portable
+    // Asegurar que el runtime python (embeddable) exista en portable
+    let ensuredPy = null;
     try {
-      const ensured = await ensureRuntimeVenvExtracted();
-      if (!ensured.ok) {
-        dialog.showErrorBox(
-          'Error',
-          `No se pudo preparar el Python portable.\n\n${ensured.error}\n\nRuta esperada: ${ensured.pythonExe}`
-        );
+      ensuredPy = await ensureRuntimeEmbeddedPythonReady();
+      if (!ensuredPy.ok) {
+        dialog.showErrorBox('Error', `No se pudo preparar el Python portable.\n\n${ensuredPy.error}\n\nRuta: ${ensuredPy.pythonExe}`);
       }
     } catch (e) {
-      dialog.showErrorBox('Error', `No se pudo extraer venv.zip.\n\n${String(e?.message || e)}`);
+      dialog.showErrorBox('Error', `No se pudo preparar el Python portable.\n\n${String(e?.message || e)}`);
     }
 
     // Iniciar el servidor Python
-    startPythonServer();
+    startPythonServer(ensuredPy?.ok ? ensuredPy.pythonExe : null);
 
     // Esperar a que el backend realmente responda antes de mostrar UI
     const ready = await waitForBackendReady(25000);

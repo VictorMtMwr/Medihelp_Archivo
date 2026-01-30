@@ -1,4 +1,12 @@
-// Función para iniciar sesión
+(function () {
+  if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("booking_done") === "true" && sessionStorage.getItem("docs_uploaded") !== "true") {
+    window.location.replace("documentos.html");
+  }
+})();
+
+/**
+ * Valida tipo y número de documento, llama a /api/hiscsec y navega a registro con los datos en sessionStorage.
+ */
 async function iniciarSesion() {
   const API_BASE = (typeof window !== "undefined" && window.APP_CONFIG)
     ? window.APP_CONFIG.BACKEND_BASE
@@ -19,7 +27,6 @@ async function iniciarSesion() {
         helpText.textContent = "Por favor, ingrese el número de documento.";
       }
     }
-    // Llevar el foco al campo que falta para que el usuario pueda escribir de inmediato
     if (!loginHistipdoc) {
       document.getElementById("loginHistipdoc").focus();
     } else if (!loginHisckey) {
@@ -33,10 +40,7 @@ async function iniciarSesion() {
       helpText.textContent = "";
       helpText.classList.remove("login-error");
     }
-
-    // Consultar HISCSEC en el backend usando el HISCKEY
     const resp = await fetch(`${API_BASE}/api/hiscsec/${encodeURIComponent(loginHisckey)}`);
-
     if (!resp.ok) {
       if (resp.status === 404) {
         if (helpText) {
@@ -51,14 +55,10 @@ async function iniciarSesion() {
       }
       return;
     }
-
     const data = await resp.json();
-
-    // Guardar datos en sessionStorage para usarlos en el registro
     sessionStorage.setItem("histipdoc", loginHistipdoc);
     sessionStorage.setItem("hisckey", loginHisckey);
     sessionStorage.setItem("hiscsec", data.hiscsec ?? "");
-
     window.location.href = "registro.html";
   } catch (error) {
     console.error("Error al llamar al backend /api/hiscsec:", error);
@@ -69,33 +69,35 @@ async function iniciarSesion() {
   }
 }
 
+/**
+ * Muestra un toast en #toastContainer. Si no existe, no hace nada.
+ * @param {string} title - Título.
+ * @param {string} message - Mensaje.
+ * @param {string} [variant="success"] - success | warn | error.
+ * @param {string|null} details - Texto en "Ver detalles".
+ * @param {number} [timeoutMs=5000] - Tiempo para auto-ocultar (0 = no).
+ */
 function showToast(title, message, variant = "success", details = null, timeoutMs = 5000) {
   const toastContainer = document.getElementById("toastContainer");
   if (!toastContainer) return;
 
   const el = document.createElement("div");
   el.className = `toast toast-${variant}`;
-
   const header = document.createElement("div");
   header.className = "toast-header";
-
   const t = document.createElement("div");
   t.className = "toast-title";
   t.textContent = title;
-
   const close = document.createElement("button");
   close.className = "toast-close";
   close.type = "button";
   close.setAttribute("aria-label", "Cerrar");
   close.textContent = "×";
-
   const body = document.createElement("div");
   body.className = "toast-body";
   body.textContent = message;
-
   header.append(t, close);
   el.append(header, body);
-
   if (details) {
     const det = document.createElement("details");
     const sum = document.createElement("summary");
@@ -105,7 +107,6 @@ function showToast(title, message, variant = "success", details = null, timeoutM
     det.append(sum, pre);
     el.append(det);
   }
-
   const remove = () => {
     try { el.remove(); } catch (_e) {}
   };
@@ -114,11 +115,9 @@ function showToast(title, message, variant = "success", details = null, timeoutM
   if (timeoutMs && timeoutMs > 0) window.setTimeout(remove, timeoutMs);
 }
 
-// Permitir Enter en los campos de login
 document.addEventListener("DOMContentLoaded", () => {
   const loginHistipdoc = document.getElementById("loginHistipdoc");
   const loginHisckey = document.getElementById("loginHisckey");
-  
   if (loginHistipdoc && loginHisckey) {
     loginHistipdoc.addEventListener("keypress", (e) => {
       if (e.key === "Enter") loginHisckey.focus();
@@ -128,8 +127,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     loginHistipdoc.focus();
   }
-
-  // Mostrar "flash toast" si viene desde Documentos
   try {
     const raw = localStorage.getItem("flash_toast");
     if (raw) {
@@ -149,8 +146,5 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       }
     }
-  } catch (_e) {
-    // ignorar
-  }
+  } catch (_e) {}
 });
-

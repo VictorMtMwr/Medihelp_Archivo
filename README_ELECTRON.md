@@ -7,7 +7,9 @@ Esta aplicación ha sido convertida a una aplicación de escritorio usando Elect
 1. **Node.js y npm**: Necesitas tener Node.js instalado (versión 14 o superior)
    - Verificar instalación: `node --version` y `npm --version`
 
-2. **Entorno virtual de Python**: Ya está creado en `venv/`
+2. **Python para construir (Windows)**: instala **Python 3.13 (x64)** desde python.org (no Microsoft Store)
+   - Esto es importante porque dependencias como **pydantic_core** necesitan wheels compatibles (en Python 3.14 no van a instalar bien).
+3. **Entorno virtual de Python**: se creará en `venv/` al ejecutar `npm run setup-venv`
 
 ## Instalación
 
@@ -32,23 +34,35 @@ npm run dev
 
 ## Generar ejecutable portable (Windows)
 
-Este proyecto inicia un servidor **Python/FastAPI** al arrancar Electron. Para que el `.exe` sea realmente “portable”, lo ideal es tener un `venv/` en la raíz del proyecto (aunque esté en `.gitignore`), porque el empaquetado lo incluirá como recurso “unpacked”.
+Este proyecto inicia un servidor **Python/FastAPI** al arrancar Electron. Para que el `.exe` funcione **en cualquier equipo de la red** (sin tener Python instalado), el portable incluye:
+
+- **Python embeddable** (zip oficial de python.org) → `build/python-embed.zip`
+- **Dependencias** (site-packages) → `build/site-packages.zip` (se genera desde tu `venv/`)
+
+Al arrancar, Electron extrae ambos a `Medihelp Archivo Runtime\\python` (junto al `.exe` en modo portable) y levanta el backend con ese `python.exe`.
 
 1. Instala dependencias de Node:
 ```bash
 npm install
 ```
 
-2. (Recomendado) Crea/actualiza el `venv/` con dependencias del backend:
-   - Asegúrate de que al ejecutar `npm start` el servidor Python arranca sin errores.
-
-3. Genera el portable:
+2. **Crear venv para instalar dependencias** (obligatorio antes del build):
 ```bash
-npm run dist:portable
+npm run setup-venv
+```
+   - Usa **Python 3.13 (x64)** desde **python.org** (no Microsoft Store) para poder instalar `requirements.txt`.
+
+3. **Descargar Python embeddable (x64)** y guardarlo como `build/python-embed.zip`:
+   - Ve a python.org → Windows → “**Windows embeddable package (64-bit)**”.
+   - Descarga el `.zip` y **renómbralo** exactamente a `build/python-embed.zip`.
+
+4. Genera el portable:
+```bash
+npm run build
 ```
 
 Salida esperada:
-- `dist/Medihelp Archivo-Portable-1.0.0.exe` (el número de versión depende de `package.json`)
+- `dist-build/Medihelp Archivo-Portable-1.0.0.exe`
 
 ## Cómo Funciona
 
@@ -74,9 +88,23 @@ Salida esperada:
 
 ## Solución de Problemas
 
-Si el servidor no inicia:
-- Verifica que el entorno virtual esté creado: `python3 -m venv venv`
-- Verifica que las dependencias de Python estén instaladas: `pip install -r requirements.txt`
+**"No module named uvicorn" al abrir el portable**  
+El `.exe` usa un Python embebido que carga dependencias desde `site-packages.zip`. Ese zip se genera desde tu `venv\Lib\site-packages` al hacer el build. Si no ejecutaste `npm run setup-venv` antes de `npm run build`, el venv no tendrá uvicorn y el portable fallará. **Solución:** en la máquina donde compilas, ejecuta `npm run setup-venv` y luego `npm run build` de nuevo. El script de build ahora comprueba que exista uvicorn en el venv y, si falta, instala las dependencias antes de empaquetar.
+
+**Sigue saliendo "did not find executable at 'C:\\Python314\\python.exe'"**  
+Eso indica que estás ejecutando un portable viejo que todavía dependía del venv. Asegúrate de usar el `.exe` nuevo (el que ya empaqueta `python-embed.zip` y `site-packages.zip`).
+
+Además, si estás ejecutándolo desde una carpeta que ya tenía runtime, borra la carpeta:
+- `Medihelp Archivo Runtime`
+
+o simplemente vuelve a abrir el `.exe`. La app guarda un marcador y **re-extrae** el runtime cuando detecta cambios en los zips.
+
+**Error "Falta build\\python-embed.zip" al compilar**  
+Te falta descargar el zip embeddable de python.org y guardarlo como `build/python-embed.zip`.
+
+Si el servidor no inicia en desarrollo:
+- Crea el venv portable: `npm run setup-venv`
+- O manualmente: `python -m venv venv` y `.\venv\Scripts\pip install -r requirements.txt`
 
 Si Electron no se instala:
 - Verifica que Node.js esté instalado correctamente

@@ -1,10 +1,14 @@
 let archivos = [];
 
-// Ruta base UNC. Usar String.raw para evitar que JS "coma" los backslashes.
-// Valor real: \\filemh01\USERS\gustavob\Documents\GUSTAVO.BLANCO
 const RUTA_BASE = String.raw`\\filemh01\USERS\gustavob\Documents\GUSTAVO.BLANCO`;
-const RUTIMA_CACHE = new Map(); // s1codima(string) -> destDir(string)
+const RUTIMA_CACHE = new Map();
 
+/**
+ * Concatena directorio UNC y nombre de archivo (normaliza barras y espacios).
+ * @param {string} dir - Ruta UNC del directorio.
+ * @param {string} name - Nombre del archivo.
+ * @returns {string}
+ */
 function joinUncDirAndName(dir, name) {
   const d = String(dir || "").trim().replaceAll("/", "\\").replace(/\s+$/g, "");
   if (!d) return name;
@@ -12,15 +16,25 @@ function joinUncDirAndName(dir, name) {
   return `${normalized}\\${name}`;
 }
 
+/**
+ * Normaliza una ruta rutima a formato UNC (\\\\servidor\\share\\...).
+ * @param {string} rutima - Ruta devuelta por imahc/get.
+ * @returns {string}
+ */
 function normalizeRutimaDir(rutima) {
   const raw = String(rutima || "").replaceAll("/", "\\").replace(/\s+$/g, "").trim();
   if (!raw) return "";
-  // asegurar \\ al inicio
   if (raw.startsWith("\\\\")) return raw;
   if (raw.startsWith("\\")) return `\\${raw}`;
   return `\\\\${raw}`;
 }
 
+/**
+ * Obtiene la ruta destino (rutima) para un S1CODIMA vía API imahc/get; usa caché.
+ * @param {string} backendBase - URL base del backend.
+ * @param {string} s1codima - Código S1CODIMA.
+ * @returns {Promise<string>}
+ */
 async function getRutimaDirForCodima(backendBase, s1codima) {
   const code = String(s1codima || "").trim();
   if (!code) return "";
@@ -56,19 +70,23 @@ const S1CODIMA_OPTIONS = (typeof window !== "undefined" && window.APP_CONFIG && 
   : [];
 const S1CODIMA_MAP = new Map(S1CODIMA_OPTIONS.map((o) => [String(o.value), o]));
 
-// Inicializar cuando se carga la página
 document.addEventListener("DOMContentLoaded", () => {
-  // Verificar que hay datos del registro
   const histipdoc = sessionStorage.getItem("histipdoc");
   const hisckey = sessionStorage.getItem("hisckey");
-  
   if (!histipdoc || !hisckey) {
-    // Si no hay datos, redirigir al login
     window.location.href = "login.html";
     return;
   }
-
-  // Mostrar también en el header (Documentos)
+  const bookingDone = sessionStorage.getItem("booking_done") === "true";
+  const docsUploaded = sessionStorage.getItem("docs_uploaded") === "true";
+  if (bookingDone && !docsUploaded) {
+    history.pushState({ blockBack: true }, "", window.location.href);
+    window.addEventListener("popstate", () => {
+      if (sessionStorage.getItem("booking_done") === "true" && sessionStorage.getItem("docs_uploaded") !== "true") {
+        history.pushState({ blockBack: true }, "", window.location.href);
+      }
+    });
+  }
   const hdrTip = document.getElementById("hdr-histipdoc-docs");
   const hdrKey = document.getElementById("hdr-hisckey-docs");
   if (hdrTip) hdrTip.textContent = histipdoc;
@@ -77,8 +95,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const apellidos = sessionStorage.getItem("apellidos") || "";
   const hdrNombre = document.getElementById("hdr-nombre-apellido-docs");
   if (hdrNombre) hdrNombre.textContent = [nombres, apellidos].filter(Boolean).join(" ") || "—";
-
-  // Inicializar event listeners
   if (dropZone && fileInput) {
     dropZone.addEventListener("click", () => fileInput.click());
     fileInput.addEventListener("change", e => handleFiles(e.target.files));
@@ -96,9 +112,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+/**
+ * Muestra un toast (notificación no bloqueante). Si no hay contenedor, escribe en consola.
+ * @param {string} title - Título.
+ * @param {string} message - Mensaje.
+ * @param {string} [variant="success"] - success | warn | error.
+ * @param {string|null} details - Texto opcional en sección "Ver detalles".
+ * @param {number} [timeoutMs=6000] - Tiempo tras el cual se oculta (0 = no auto-ocultar).
+ */
 function showToast(title, message, variant = "success", details = null, timeoutMs = 6000) {
   if (!toastContainer) {
-    // Fallback final: no bloquear con alert; solo consola.
     console.log(`[Toast:${variant}] ${title} - ${message}`);
     if (details) console.log(details);
     return;
@@ -149,6 +172,11 @@ function showToast(title, message, variant = "success", details = null, timeoutM
   }
 }
 
+/**
+ * Muestra u oculta el overlay de carga con texto opcional.
+ * @param {boolean} isOpen - true para mostrar, false para ocultar.
+ * @param {string} [text="Procesando…"] - Texto a mostrar.
+ */
 function setLoading(isOpen, text = "Procesando…") {
   if (!loadingOverlay) return;
   if (isOpen) {
@@ -167,6 +195,11 @@ function setLoading(isOpen, text = "Procesando…") {
   }
 }
 
+/**
+ * Muestra un modal de confirmación (Guardar/Revisar). Resuelve true si confirma, false si cancela.
+ * @param {Object} opts - title, message, confirmText, cancelText.
+ * @returns {Promise<boolean>}
+ */
 function confirmGuardarModal({
   title = "¿Desea cerrar el folio y guardar?",
   message = "Seleccione 'Revisar' si desea revisar algún documento antes de guardar.",
@@ -174,7 +207,6 @@ function confirmGuardarModal({
   cancelText = "Revisar",
 } = {}) {
   return new Promise((resolve) => {
-    // Fallback por si falta el modal en el HTML
     if (!confirmModal || !confirmModalTitle || !confirmModalDesc || !confirmModalCancel || !confirmModalConfirm) {
       const ok = window.confirm(`${title}\n\n${message}`);
       resolve(!!ok);
@@ -185,8 +217,6 @@ function confirmGuardarModal({
     confirmModalDesc.textContent = message;
     confirmModalConfirm.textContent = confirmText;
     confirmModalCancel.textContent = cancelText;
-
-    // Mostrar (solo cuando se confirma guardado)
     confirmModal.hidden = false;
     confirmModal.removeAttribute("hidden");
     confirmModal.classList.add("is-open");
@@ -195,7 +225,6 @@ function confirmGuardarModal({
       confirmModal.hidden = true;
       confirmModal.setAttribute("hidden", "");
       confirmModal.classList.remove("is-open");
-      // limpiar handlers (más robusto que removeEventListener si hay múltiples aperturas)
       confirmModal.onclick = null;
       confirmModalCancel.onclick = null;
       confirmModalConfirm.onclick = null;
@@ -213,13 +242,10 @@ function confirmGuardarModal({
     };
 
     const onOverlayClick = (e) => {
-      // si hace click fuera del cuadro, se considera "Revisar"
       if (e.target === confirmModal) onCancel();
     };
-
     const onKeyDown = (e) => {
       if (e.key === "Escape") onCancel();
-      // Evitar confirmaciones accidentales con Enter (el usuario debe hacer click)
     };
 
     confirmModalCancel.onclick = (e) => {
@@ -232,14 +258,15 @@ function confirmGuardarModal({
     };
     confirmModal.onclick = onOverlayClick;
     document.addEventListener("keydown", onKeyDown);
-
-    // Foco inicial
     window.setTimeout(() => {
       try { confirmModalConfirm.focus(); } catch (_e) {}
     }, 0);
   });
 }
 
+/**
+ * Navega a registro.html; si hay booking hecho y documentos no guardados, muestra toast y no navega.
+ */
 function volverAtras() {
   const bookingDone = sessionStorage.getItem("booking_done") === "true";
   const docsUploaded = sessionStorage.getItem("docs_uploaded") === "true";
@@ -250,8 +277,14 @@ function volverAtras() {
   window.location.href = "registro.html";
 }
 
+/**
+ * Crea el control de entrada para S1CODIMA (input con datalist y validación contra S1CODIMA_OPTIONS).
+ * @param {string} valorActual - Valor inicial del código.
+ * @param {function(string): void} onChange - Callback con el código normalizado al cambiar.
+ * @param {number} idx - Índice para id único del datalist.
+ * @returns {HTMLElement}
+ */
 function crearS1CodimaControl(valorActual, onChange, idx) {
-  // Un solo campo (una celda) con autocompletado + escritura manual
   const wrapper = document.createElement("div");
   wrapper.className = "s1codima-field";
 
@@ -260,8 +293,6 @@ function crearS1CodimaControl(valorActual, onChange, idx) {
   input.inputMode = "numeric";
   input.className = "s1codima-input";
   input.placeholder = "S1CODIMA (seleccione o escriba el código)";
-
-  // datalist para mostrar "código - nombre" en una sola celda
   const listId = `s1codima-list-${idx}`;
   input.setAttribute("list", listId);
 
@@ -347,6 +378,10 @@ function crearS1CodimaControl(valorActual, onChange, idx) {
   return wrapper;
 }
 
+/**
+ * Muestra un placeholder en el preview cuando no se puede renderizar el PDF.
+ * @param {HTMLElement} preview - Contenedor del preview.
+ */
 function mostrarFallbackPDF(preview) {
   preview.innerHTML = `
     <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f5f5f5;">
@@ -356,8 +391,12 @@ function mostrarFallbackPDF(preview) {
   `;
 }
 
+/**
+ * Muestra el PDF con iframe como fallback cuando PDF.js no está o falla.
+ * @param {HTMLElement} preview - Contenedor.
+ * @param {string} fileUrl - URL del objeto (createObjectURL).
+ */
 function mostrarEmbedPDF(preview, fileUrl) {
-  // Fallback final (Windows/Electron): incrustar el PDF directamente
   preview.innerHTML = "";
   const iframe = document.createElement("iframe");
   iframe.src = `${fileUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0`;
@@ -370,8 +409,13 @@ function mostrarEmbedPDF(preview, fileUrl) {
   preview.appendChild(iframe);
 }
 
+/**
+ * Renderiza la primera página del PDF con PDF.js; si falla, usa iframe.
+ * @param {HTMLElement} preview - Contenedor.
+ * @param {File} file - Archivo PDF.
+ * @param {string} fileUrl - URL.createObjectURL(file).
+ */
 async function renderPdfPreview(preview, file, fileUrl) {
-  // Intenta renderizar con PDF.js (sin worker) y si falla, usa embed.
   if (typeof pdfjsLib === "undefined") {
     mostrarEmbedPDF(preview, fileUrl);
     return;
@@ -383,10 +427,8 @@ async function renderPdfPreview(preview, file, fileUrl) {
     const buffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buffer, disableWorker: true }).promise;
     const page = await pdf.getPage(1);
-
-    // Render simple (evita escalas gigantes que fallan en Windows con PDFs pesados)
     const baseViewport = page.getViewport({ scale: 1 });
-    const desiredCssWidth = 290; // aprox. ancho de la card
+    const desiredCssWidth = 290;
     const cssScale = Math.min(2, desiredCssWidth / baseViewport.width);
     const dpr = window.devicePixelRatio || 1;
     const viewport = page.getViewport({ scale: cssScale * dpr });
@@ -411,6 +453,11 @@ async function renderPdfPreview(preview, file, fileUrl) {
   }
 }
 
+/**
+ * Añade los archivos aceptados (solo PDF) al array archivos y re-renderiza.
+ * Rechaza no-PDF con toast. En Electron usa file.path como ruta absoluta.
+ * @param {FileList|File[]} files - Archivos seleccionados o soltados.
+ */
 function handleFiles(files) {
   const incoming = Array.from(files || []);
   if (!incoming.length) return;
@@ -443,16 +490,11 @@ function handleFiles(files) {
 
   aceptados.forEach(file => {
     let rutaAbsoluta = null;
-    
-    // En Electron, file.path contiene la ruta absoluta completa
     if (file.path) {
       rutaAbsoluta = file.path;
-    }
-    // Si estamos en un navegador web (fallback)
-    else if (window.electronAPI && window.electronAPI.getFilePath) {
+    } else if (window.electronAPI && window.electronAPI.getFilePath) {
       rutaAbsoluta = window.electronAPI.getFilePath(file);
     }
-    // Si no se puede obtener la ruta absoluta, usar la ruta base configurada
     if (!rutaAbsoluta) {
       rutaAbsoluta = `${RUTA_BASE}\\${file.name}`;
     }
@@ -465,39 +507,33 @@ function handleFiles(files) {
       file
     });
   });
-  // Marcar que al menos 1 documento fue cargado en esta sesión
   try {
     if (aceptados.length > 0) sessionStorage.setItem("docs_uploaded", "true");
   } catch (_e) {}
   render();
 }
 
+/**
+ * Vuelve a dibujar la grilla de documentos (cards con preview, S1CODIMA, eliminar).
+ */
 function render() {
   if (!grid) return;
-  
   grid.innerHTML = "";
-
   archivos.forEach((a, i) => {
     const card = document.createElement("div");
     card.className = "card";
 
     const preview = document.createElement("div");
     preview.className = "preview";
-    
-    // Crear URL del objeto para previsualización
     const fileUrl = URL.createObjectURL(a.file);
     const fileName = a.file.name.toLowerCase();
-    
-    // Determinar tipo de archivo y mostrar previsualización apropiada
     if (fileName.endsWith('.pdf')) {
       renderPdfPreview(preview, a.file, fileUrl);
       
     } else if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)) {
-      // Para imágenes, usar img tag
       const img = document.createElement("img");
       img.src = fileUrl;
       img.onload = () => {
-        // Ajustar el preview al tamaño exacto de la imagen
         const cardElement = preview.closest('.card');
         const containerWidth = cardElement ? (cardElement.offsetWidth - 30) : 290;
         const imgAspectRatio = img.naturalWidth / img.naturalHeight;
@@ -516,14 +552,12 @@ function render() {
       };
       preview.appendChild(img);
     } else {
-      // Para otros tipos, mostrar icono genérico
       preview.innerHTML = "<span>📄</span>";
     }
-
     const name = document.createElement("div");
     name.className = "filename";
     name.textContent = a.file.name;
-    name.title = a.file.name; // Tooltip con nombre completo
+    name.title = a.file.name;
 
     const s1Control = crearS1CodimaControl(a.s1CODIMA, (val) => {
       a.s1CODIMA = val;
@@ -534,15 +568,12 @@ function render() {
     del.textContent = "Eliminar";
     del.tabIndex = -1;
     del.onclick = () => {
-      // Liberar URL del objeto al eliminar
       if (a.fileUrl) {
         URL.revokeObjectURL(a.fileUrl);
       }
       archivos.splice(i, 1);
       render();
     };
-
-    // Guardar la URL en el objeto para poder liberarla después
     a.fileUrl = fileUrl;
 
     card.append(preview, name, s1Control, del);
@@ -550,6 +581,10 @@ function render() {
   });
 }
 
+/**
+ * Valida S1CODIMA, muestra modal de confirmación, envía registros a /guardar y copia archivos
+ * a dest_dir vía /api/archivos/copiar. Al finalizar OK, libera folio y redirige a login.
+ */
 async function guardar() {
   if (!archivos || archivos.length === 0) {
     showToast("Validación", "Debe cargar al menos 1 documento antes de guardar.", "error", null, 7000);
@@ -591,8 +626,6 @@ async function guardar() {
     : "http://127.0.0.1:8000";
 
   setLoading(true, "Guardando…");
-
-  // Obtener datos del formulario desde sessionStorage
   const histipdoc = sessionStorage.getItem("histipdoc");
   const hisckey = sessionStorage.getItem("hisckey");
   const hiscsec = sessionStorage.getItem("hiscsec") || "";
@@ -600,16 +633,8 @@ async function guardar() {
   const imatipreg = sessionStorage.getItem("imatipreg") || "";
   const imausureg = sessionStorage.getItem("imausureg") || "";
   const codpro = sessionStorage.getItem("codpro") || "";
-
-  // Generar fecha y hora automáticamente en el momento de guardar
-  // Formato ISO esperado por la API (ej: 2026-01-27T20:15:11.482Z)
   const fechaHora = new Date().toISOString();
-  
-  // Calcular IMACNSREG para cada archivo: contador creciente por cada repetición de S1CODIMA
-  // Si un S1CODIMA se repite, el primero tiene 1, el segundo 2, etc.
   const contadorS1CODIMA = {};
-
-  // Resolver rutima por S1CODIMA (en paralelo, con caché)
   const uniqueCodes = Array.from(new Set(archivos.map((a) => String(a.s1CODIMA || "").trim()))).filter(Boolean);
   const rutimaByCode = new Map();
   try {
@@ -619,41 +644,23 @@ async function guardar() {
       rutimaByCode.set(code, dir || "");
     }));
   } catch (e) {
-    // No bloqueamos si falla: usamos fallback RUTA_BASE
     console.warn("[IMAHC] No se pudo resolver rutima, usando fallback:", e);
     showToast("Aviso", "No se pudo consultar la ruta (rutima) para algunos S1CODIMA. Se usará ruta por defecto.", "warn", e?.message || String(e), 12000);
   }
-  
-  // Crear un registro por cada archivo
   const registros = archivos.map(a => {
     const s1CODIMA = a.s1CODIMA;
-    
-    // Inicializar contador para este S1CODIMA si no existe (empezando en 1)
     if (!contadorS1CODIMA[s1CODIMA]) {
       contadorS1CODIMA[s1CODIMA] = 1;
     } else {
-      // Incrementar si ya existe
       contadorS1CODIMA[s1CODIMA]++;
     }
-    
-    // Asignar el valor del contador (empezando desde 1)
     const imacnsreg = contadorS1CODIMA[s1CODIMA];
-    // Guardar IMACNSREG en el objeto del archivo para reutilizarlo al copiar
     a.imacnsreg = imacnsreg;
-    
-    // Obtener la extensión del archivo original
     const extension = a.file.name.split('.').pop() || 'pdf';
-    
-    // Generar nombre de archivo en formato:
-    // S1CODIMA-HISCKEY-HISTIPDOC-HISCSEC-IMACNSREG.ext
     const nombreArchivo = `${s1CODIMA}-${hisckey}-${histipdoc}-${hiscsec}-${imacnsreg}.${extension}`;
-
-    // Ruta destino: por rutima (imahc/get) y fallback a RUTA_BASE
     const destDir = rutimaByCode.get(String(s1CODIMA).trim()) || RUTA_BASE;
     a.destDir = destDir;
     const rutaDestino = joinUncDirAndName(destDir, nombreArchivo);
-    
-    // Crear un registro por cada archivo
     return {
       imapronqpk: {
         s1CODIMA: Number(s1CODIMA) || 0,
@@ -662,19 +669,15 @@ async function guardar() {
         imacnsreg: Number(imacnsreg) || 0,
         hiscsec: Number(hiscsec) || 0
       },
-      imafechor: fechaHora, // Fecha y hora automática
+      imafechor: fechaHora,
       imaobs: imaobs,
       imatipreg: imatipreg,
       imausureg: imausureg,
       codpro: codpro,
-      imarutpro: rutaDestino  // Ruta destino final (UNC) con nombre formateado
+      imarutpro: rutaDestino
     };
   });
 
-  console.log("Registros a guardar:", registros);
-  console.log(`Total de registros a guardar: ${registros.length}`);
-
-  // Guardar cada registro por separado con un pequeño delay entre cada uno
   const guardarRegistros = async () => {
     try {
       setLoading(true, "Enviando registros…");
@@ -691,15 +694,10 @@ async function guardar() {
         if (!response.ok) {
           throw new Error(`Error al guardar registro ${i + 1}`);
         }
-        
-        // Pequeño delay entre registros para evitar problemas
         if (i < registros.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
-      
-      // Copiar archivos al servidor una vez guardado el registro
-      // Copiar archivos al servidor una vez guardado el registro (vía backend FastAPI)
       setLoading(true, "Copiando archivos…");
       const copyErrors = [];
       const copied = [];
@@ -711,8 +709,6 @@ async function guardar() {
         const extension = a.file?.name?.split(".").pop() || "pdf";
         const nombreArchivo = `${s1CODIMA}-${hisckey}-${histipdoc}-${hiscsec}-${imacnsreg}.${extension}`;
         const destDir = a.destDir || rutimaByCode.get(String(s1CODIMA).trim()) || RUTA_BASE;
-
-        // Por ahora el backend valida .pdf; si llega otro tipo, se reporta como error.
         const form = new FormData();
         form.append("file", a.file);
         form.append("dest_name", nombreArchivo);
@@ -757,8 +753,6 @@ async function guardar() {
           `${preview}`,
           12000
         );
-
-        // Dejar la pantalla lista para cargar nuevos documentos (sin bloquear)
         setLoading(false);
         archivos.forEach((a) => {
           try {
@@ -780,18 +774,12 @@ async function guardar() {
           `Destinos (ejemplos):\n${destDirs || RUTA_BASE}\n\nEjemplos copiados:\n${first}`,
           5000
         );
-
-        // Liberar bloqueo de cierre del folio (ya guardó y copió OK)
         try {
           localStorage.setItem("folio_closed", "true");
           localStorage.removeItem("folio_locked");
         } catch (_e) {}
-
-        // Confirmado guardado + copiado: volver a login
         window.setTimeout(() => {
-          // Mostrar overlay solo al momento de redirigir
           setLoading(true, "Redirigiendo a login…");
-          // Guardar toast para mostrarlo en login el tiempo restante (hasta completar 5s)
           try {
             localStorage.setItem("flash_toast", JSON.stringify({
               title: "Guardado OK",

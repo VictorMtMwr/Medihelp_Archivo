@@ -6,9 +6,10 @@
   "scripts": {
     "start": "electron . --no-sandbox",
     "dev": "electron . --dev --no-sandbox",
+    "setup-venv": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-venv-portable.ps1",
     "dist": "electron-builder",
-    "dist:portable": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; New-Item -ItemType Directory -Force build | Out-Null; Compress-Archive -Path .\\venv -DestinationPath .\\build\\venv.zip -Force; .\\node_modules\\.bin\\electron-builder.cmd --win portable\"",
-    "build": "powershell -NoProfile -Command \"$ErrorActionPreference='Continue'; Get-Process | Where-Object ProcessName -like 'Medihelp*' | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue .\\dist-build; $ErrorActionPreference='Stop'; New-Item -ItemType Directory -Force build | Out-Null; Compress-Archive -Path .\\venv -DestinationPath .\\build\\venv.zip -Force; .\\node_modules\\.bin\\electron-builder.cmd --win portable\""
+    "dist:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-portable.ps1",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-portable.ps1"
   },
   "keywords": [
     "electron",
@@ -44,8 +45,12 @@
         "to": "backend"
       },
       {
-        "from": "build/venv.zip",
-        "to": "venv.zip"
+        "from": "build/python-embed.zip",
+        "to": "python-embed.zip"
+      },
+      {
+        "from": "build/site-packages.zip",
+        "to": "site-packages.zip"
       }
     ],
     "win": {

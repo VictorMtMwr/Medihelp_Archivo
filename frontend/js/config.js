@@ -1,10 +1,9 @@
+/**
+ * Configuración global de la aplicación: URL del backend y opciones S1CODIMA (código y etiqueta).
+ */
 window.APP_CONFIG = {
   BACKEND_BASE: "http://127.0.0.1:8000",
-
   MEDIHELP_BASE: "http://172.16.2.51:8070/Medihelp-api",
-
-  // Opciones de S1CODIMA (código - nombre)
-  // value: código que se guarda; label: lo que ve el usuario
   S1CODIMA_OPTIONS: [
     { value: "1", label: "1 - RECORD DE ANESTESIA" },
     { value: "2", label: "2 - RESULTADO ESTUDIO" },
@@ -24,4 +23,3 @@ window.APP_CONFIG = {
     { value: "17", label: "17 - RESERVAS DE COMPONENTES SANGUI" },
   ],
 };
-

@@ -1,14 +1,14 @@
 let archivos = [];
 
-// Backend local (FastAPI) que actúa como proxy y guarda registros
 const API_BASE = (typeof window !== "undefined" && window.APP_CONFIG)
   ? window.APP_CONFIG.BACKEND_BASE
   : "http://127.0.0.1:8000";
 
-// Ruta base configurada automáticamente
 const RUTA_BASE = "\\filemh01\USERS\gustavob\Documents\GUSTAVO.BLANCO";
 
-// Función para iniciar sesión
+/**
+ * Valida login, pre-llena histipdoc/hisckey, oculta login y muestra formulario principal.
+ */
 function iniciarSesion() {
   const loginHistipdoc = document.getElementById("loginHistipdoc").value.trim();
   const loginHisckey = document.getElementById("loginHisckey").value.trim();
@@ -17,26 +17,21 @@ function iniciarSesion() {
     alert("Por favor, complete todos los campos");
     return;
   }
-  
-  // Pre-llenar los campos del formulario principal
   document.getElementById("histipdoc").value = loginHistipdoc;
   document.getElementById("hisckey").value = loginHisckey;
-  
-  // Ocultar pantalla de login y mostrar formulario principal
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("formularioPrincipal").style.display = "block";
-  
-  // Inicializar event listeners del formulario principal
   inicializarFormularioPrincipal();
 }
 
-// Función para inicializar los event listeners del formulario principal
+/**
+ * Configura drop zone y file input para arrastrar/seleccionar archivos.
+ */
 function inicializarFormularioPrincipal() {
   const dropZone = document.getElementById("dropZone");
   const fileInput = document.getElementById("fileInput");
   
   if (dropZone && fileInput) {
-    // Remover listeners anteriores si existen
     dropZone.replaceWith(dropZone.cloneNode(true));
     const newDropZone = document.getElementById("dropZone");
     const newFileInput = document.getElementById("fileInput");
@@ -59,7 +54,6 @@ function inicializarFormularioPrincipal() {
 
 const grid = document.getElementById("grid");
 
-// Permitir Enter en los campos de login
 document.addEventListener("DOMContentLoaded", () => {
   const loginHistipdoc = document.getElementById("loginHistipdoc");
   const loginHisckey = document.getElementById("loginHisckey");
@@ -79,24 +73,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+/**
+ * Añade archivos al array archivos (usa file.path en Electron o electronAPI.getFilePath).
+ * @param {FileList|File[]} files - Archivos seleccionados.
+ */
 function handleFiles(files) {
   Array.from(files).forEach(file => {
     let rutaAbsoluta = null;
-    
-    // En Electron, file.path contiene la ruta absoluta completa
     if (file.path) {
       rutaAbsoluta = file.path;
-    }
-    // Si estamos en un navegador web (fallback)
-    else if (window.electronAPI && window.electronAPI.getFilePath) {
+    } else if (window.electronAPI && window.electronAPI.getFilePath) {
       rutaAbsoluta = window.electronAPI.getFilePath(file);
     }
-    // Si no se puede obtener la ruta absoluta, usar la ruta base configurada
     if (!rutaAbsoluta) {
       rutaAbsoluta = RUTA_BASE + file.name;
     }
-    
-    console.log('Archivo cargado:', file.name, 'Ruta absoluta:', rutaAbsoluta);
     
     archivos.push({
       imarutpro: rutaAbsoluta,
@@ -107,6 +98,9 @@ function handleFiles(files) {
   render();
 }
 
+/**
+ * Vuelve a dibujar la grilla de cards (preview, nombre, input S1CODIMA, eliminar).
+ */
 function render() {
   grid.innerHTML = "";
 
@@ -140,8 +134,10 @@ function render() {
   });
 }
 
+/**
+ * Vacía campos del formulario, array archivos y el input file; re-renderiza la grilla.
+ */
 function limpiarFormulario() {
-  // Limpiar todos los campos del formulario
   document.getElementById("histipdoc").value = "";
   document.getElementById("hisckey").value = "";
   document.getElementById("hiscsec").value = "";
@@ -150,20 +146,16 @@ function limpiarFormulario() {
   document.getElementById("imatipreg").value = "";
   document.getElementById("imausureg").value = "";
   document.getElementById("imaobs").value = "";
-  
-  // Limpiar la lista de archivos
   archivos = [];
-  
-  // Limpiar el input de archivos
   const fileInput = document.getElementById("fileInput");
-  if (fileInput) {
-    fileInput.value = "";
-  }
-  
-  // Re-renderizar la grilla (quedará vacía)
+  if (fileInput) fileInput.value = "";
   render();
 }
 
+/**
+ * Valida S1CODIMA en todos los archivos, genera registros con imacnsreg e imafechor,
+ * envía POST /guardar por cada uno y al finalizar OK limpia y muestra alert.
+ */
 function guardar() {
   let valido = true;
 
@@ -178,9 +170,6 @@ function guardar() {
     alert("Todos los documentos deben tener S1CODIMA");
     return;
   }
-
-  // Generar fecha y hora automáticamente en el momento de guardar
-  // Formato: YYYY-MM-DD HH:MM:SS.mmm
   const ahora = new Date();
   const año = ahora.getFullYear();
   const mes = String(ahora.getMonth() + 1).padStart(2, '0');
@@ -190,27 +179,15 @@ function guardar() {
   const segundos = String(ahora.getSeconds()).padStart(2, '0');
   const milisegundos = String(ahora.getMilliseconds()).padStart(3, '0');
   const fechaHora = `${año}-${mes}-${dia} ${horas}:${minutos}:${segundos}.${milisegundos}`;
-  
-  // Calcular IMACNSREG para cada archivo: contador creciente por cada repetición de S1CODIMA
-  // Si un S1CODIMA se repite, el primero tiene 1, el segundo 2, etc.
   const contadorS1CODIMA = {};
-  
-  // Crear un registro por cada archivo
   const registros = archivos.map(a => {
     const s1CODIMA = a.s1CODIMA;
-    
-    // Inicializar contador para este S1CODIMA si no existe (empezando en 1)
     if (!contadorS1CODIMA[s1CODIMA]) {
       contadorS1CODIMA[s1CODIMA] = 1;
     } else {
-      // Incrementar si ya existe
       contadorS1CODIMA[s1CODIMA]++;
     }
-    
-    // Asignar el valor del contador (empezando desde 1)
     const imacnsreg = contadorS1CODIMA[s1CODIMA];
-    
-    // Crear un registro por cada archivo
     return {
       imapronqpk: {
         histipdoc: histipdoc.value,
@@ -223,20 +200,14 @@ function guardar() {
       codpro: codpro.value,
       imatipreg: imatipreg.value,
       imausureg: imausureg.value,
-      archivos: a.imarutpro  // Solo la ruta absoluta del archivo (string)
+      archivos: a.imarutpro
     };
   });
 
-  console.log("Registros a guardar:", registros);
-  console.log(`Total de registros a guardar: ${registros.length}`);
-
-  // Guardar cada registro por separado con un pequeño delay entre cada uno
   const guardarRegistros = async () => {
     try {
       for (let i = 0; i < registros.length; i++) {
         const registro = registros[i];
-        console.log(`Guardando registro ${i + 1} de ${registros.length}:`, registro);
-        
         const response = await fetch(`${API_BASE}/guardar`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -246,8 +217,6 @@ function guardar() {
         if (!response.ok) {
           throw new Error(`Error al guardar registro ${i + 1}`);
         }
-        
-        // Pequeño delay entre registros para evitar problemas
         if (i < registros.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
